@@ -2,17 +2,12 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const axios = require('axios'); // Add axios to send requests to Discord
 const app = express();
 const port = 3000;
 
-// Middleware to parse JSON
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '../public')));
 
-// Serve static files from the 'public' directory
-app.use(express.static(path.join(__dirname, '../public'))); // Adjust path as needed to reach the 'public' folder
-
-// Connect to SQLite database
 const db = new sqlite3.Database(path.join(__dirname, 'database.db'), (err) => {
   if (err) {
     console.error('Error connecting to SQLite database:', err);
@@ -29,54 +24,52 @@ app.get('/api/data', (req, res) => {
       console.error('Error executing query:', err.message);
       res.status(500).json({ error: err.message });
     } else {
-      console.log('Fetched rows:', rows);
       res.json({ data: rows });
     }
   });
 });
 
-// Update an existing item
-app.put('/api/data/:id', (req, res) => {
-  const { id } = req.params;
+// Batch update items
+app.put('/api/data/batch', (req, res) => {
   const updates = req.body;
+  const updatePromises = [];
 
-  // Get old data to compare old and new values
-  const selectQuery = 'SELECT * FROM MahattanMaterials WHERE Id = ?';
-  db.get(selectQuery, [id], (err, oldData) => {
-    if (err || !oldData) {
-      console.error('Error fetching old data:', err);
-      res.status(500).json({ error: err ? err.message : 'No data found' });
-      return;
+  Object.keys(updates).forEach(id => {
+    const updateData = updates[id];
+    const fields = [];
+    const values = [];
+
+    // Construct the SET clause for the update statement dynamically
+    for (const field in updateData) {
+      fields.push(`${field} = ?`);
+      values.push(updateData[field] === null ? null : updateData[field]); // Handle NULL values
     }
 
-    // Dynamic SQL generation for only the fields that are being updated
-    const setClause = Object.keys(updates).map(field => `${field} = ?`).join(', ');
-    const values = [...Object.values(updates), id];
+    values.push(id); // Add the ID to the values array for the WHERE clause
+
+    const setClause = fields.join(', ');
     const updateQuery = `UPDATE MahattanMaterials SET ${setClause} WHERE Id = ?`;
 
-    db.run(updateQuery, values, function (err) {
-      if (err) {
-        console.error('Error updating data:', err.message);
-        res.status(500).json({ error: err.message });
-      } else {
-        res.json({ message: 'Item updated successfully' });
-
-        // Prepare data for Discord webhook
-        const changes = Object.keys(updates).map(field => {
-          return `${field}: "${oldData[field]}" -> "${updates[field]}"`;
-        }).join('\n');
-
-        // Send details to Discord webhook
-        axios.post('https://discord.com/api/webhooks/1287708153785352203/23wbSbcnGIMbVVZ5vIP8b2iGgoMjY3l7ke87ZILxp37ynh1ECw0i0a_W2ID8DNXfRfMU', {
-          content: `**Update Notification**\nItem ID: ${id}\nChanges:\n${changes}`
-        }).then(() => {
-          console.log('Update sent to Discord webhook successfully.');
-        }).catch(err => {
-          console.error('Error sending update to Discord webhook:', err.message);
+    updatePromises.push(
+      new Promise((resolve, reject) => {
+        db.run(updateQuery, values, function (err) {
+          if (err) {
+            console.error(`Error updating row with ID ${id}:`, err.message);
+            reject(err);
+          } else {
+            resolve({ id, changes: updateData });
+          }
         });
-      }
-    });
+      })
+    );
   });
+
+  Promise.all(updatePromises)
+    .then(results => res.json({ message: 'Batch update successful', results }))
+    .catch(err => {
+      console.error('Batch update failed:', err.message);
+      res.status(500).json({ error: 'Internal Server Error during batch update' });
+    });
 });
 
 // Start the server

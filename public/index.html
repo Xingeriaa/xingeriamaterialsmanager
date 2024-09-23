@@ -19,11 +19,68 @@
     th {
       background-color: #f2f2f2;
     }
+    /* CSS styles for success and error notifications */
+    #update-status {
+      margin-left: 10px;
+      font-weight: bold;
+      display: inline-block;
+      color: blue;
+      border: 1px solid blue;
+      padding: 5px;
+      border-radius: 5px;
+    }
+
+    #update-status.success {
+      color: green;
+      border: 1px solid green;
+      padding: 5px;
+      border-radius: 5px;
+    }
+
+    #update-status.error {
+      color: red;
+      border: 1px solid red;
+      padding: 5px;
+      border-radius: 5px;
+    }
+    /* Styling for the search bar */
+    #search-bar {
+      width: 200px;
+      padding: 8px;
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    #sort-amount, #filter-status {
+      margin: 10px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
   </style>
 </head>
 <body>
   <h1>Items List</h1>
-  <button id="update-all">Update</button>
+  <div class="functions-container">
+    <button id="update-all">Update</button>
+    <label id="update-status"></label>
+    <input type="text" id="search-bar" placeholder="Search items..." />
+    <!-- Sorting and filtering controls added below -->
+    <select id="sort-amount">
+      <option value="">Sort by Amount</option>
+      <option value="asc">Ascending</option>
+      <option value="desc">Descending</option>
+    </select>
+    <select id="filter-status">
+      <option value="">Filter by Status</option>
+      <option value="finished">Finished</option>
+      <option value="not-finished">Not Finished</option>
+    </select>
+  </div>
+
+  
   <table id="items-table">
     <thead>
       <tr>
