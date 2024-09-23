@@ -123,41 +123,50 @@ function updateSingleRow(id) {
 }
 
 function updateAllItems() {
-    if (Object.keys(changes).length === 0 || isUpdating) return; // Prevent update if no changes or if already updating
+  if (Object.keys(changes).length === 0 || isUpdating) return; // Prevent update if no changes or if already updating
 
-    // Validate changes before sending the update
-    // if (!validateChanges()) {
-    //     showNotification('Please fill in all related fields (Status, Worker, Proof) if one of them is filled.', 'error');
-    //     return;
-    // }
+  isUpdating = true; // Set updating flag
+  document.getElementById('update-all').disabled = true; // Disable button
+  const updateStatus = document.getElementById('update-status'); // Reference to the notification label
+  updateStatus.textContent = 'Updating...'; // Set initial status text
+  updateStatus.className = ''; // Clear previous status classes
 
-    isUpdating = true; // Set updating flag
-    document.getElementById('update-all').disabled = true; // Disable button
-    const updateStatus = document.getElementById('update-status'); // Reference to the notification label
-    updateStatus.textContent = 'Updating...'; // Set initial status text
-    updateStatus.className = ''; // Clear previous status classes
+  fetch('/api/data/batch', {
+      method: 'PUT',
+      headers: {
+          'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(changes),
+  })
+  .then(response => response.json())
+  .then(data => {
+      showNotification('Update successful!', 'success');
 
-    fetch('/api/data/batch', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(changes),
-        })
-        .then(response => response.json())
-        .then(data => {
-            showNotification('Update successful!', 'success');
-            changes = {}; // Clear changes after successful update
-        })
-        .catch(error => {
-            console.error('Error in batch update:', error);
-            showNotification('Update failed! Please try again.', 'error');
-        })
-        .finally(() => {
-            isUpdating = false; // Reset updating flag
-            document.getElementById('update-all').disabled = false; // Re-enable button
-        });
+      // Send webhook notifications for each updated field
+      Object.entries(changes).forEach(([id, updatedFields]) => {
+          const itemName = allItems.find(item => item.Id === parseInt(id)).Name; // Get item name by ID
+          for (const field in updatedFields) {
+              sendWebhookNotification(
+                  id,
+                  itemName,
+                  field,
+                  updatedFields[field]
+              );
+          }
+      });
+
+      changes = {}; // Clear changes after successful update
+  })
+  .catch(error => {
+      console.error('Error in batch update:', error);
+      showNotification('Update failed! Please try again.', 'error');
+  })
+  .finally(() => {
+      isUpdating = false; // Reset updating flag
+      document.getElementById('update-all').disabled = false; // Re-enable button
+  });
 }
+
 
 // Send a message to Discord webhook with the name included
 // Function to send a message to Discord webhook with detailed timestamp and proof content if applicable// Function to send a message to Discord webhook with detailed timestamp and proof content if applicable
